@@ -1,0 +1,399 @@
+classdef PISTON_SONORIZACION_exported < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        UIFigure                        matlab.ui.Figure
+        ParmetrosPanel                  matlab.ui.container.Panel
+        RadiodemedicionrEditField       matlab.ui.control.NumericEditField
+        RadiodemedicionrEditFieldLabel  matlab.ui.control.Label
+        velocidadsonidoCEditField       matlab.ui.control.NumericEditField
+        velocidadsonidoCEditFieldLabel  matlab.ui.control.Label
+        DensidadRhoEditField            matlab.ui.control.NumericEditField
+        DensidadRhoEditFieldLabel       matlab.ui.control.Label
+        RadioPistonaEditField           matlab.ui.control.NumericEditField
+        RadioPistonaEditFieldLabel      matlab.ui.control.Label
+        VelocidadvolumetricaUEditField  matlab.ui.control.NumericEditField
+        VelocidadvolumetricaUEditFieldLabel  matlab.ui.control.Label
+        Label                           matlab.ui.control.Label
+        FrecuenciafEditField            matlab.ui.control.NumericEditField
+        PresindelPistncircularPlanoLabel  matlab.ui.control.Label
+        PeaksButton                     matlab.ui.control.Button
+        UITable                         matlab.ui.control.Table
+        RegindeFraunhoferButton         matlab.ui.control.Button
+        RegindeFresnelButton            matlab.ui.control.Button
+        GraficarButton                  matlab.ui.control.Button
+        UIAxes                          matlab.ui.control.UIAxes
+    end
+
+    
+    properties (Access = private)
+        f % frecuencia
+        U % velocidad volumetrica
+        a % radio piston
+        rho % densidad
+        c % velocidad de sonido
+        r % radio de medicion
+        w % frecuencia angular
+        k % vector numero de onda
+        r1 % linspace
+        p3 % aproximacion 3
+        p1 % aprox 1
+        zd % distancia de Rayleight
+        zf % distancia critica
+        lamda % longitud de onda
+        valores_r % valores de r o puntos maximos
+        rn % resultados
+        resultados 
+        n % iteracion
+        x % linspace
+        minVals % valores minimos
+        num_maximos % maximos
+        num_minimos %minimos
+        total_extremos % total
+        max_p1 % maximo p1
+
+    end
+
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Value changed function: FrecuenciafEditField
+        function FrecuenciafEditFieldValueChanged(app, event)
+            app.f = app.FrecuenciafEditField.Value;  % Guardamos f como propiedad
+        end
+
+        % Value changed function: VelocidadvolumetricaUEditField
+        function VelocidadvolumetricaUEditFieldValueChanged(app, event)
+            app.U = app.VelocidadvolumetricaUEditField.Value;       
+        end
+
+        % Value changed function: RadioPistonaEditField
+        function RadioPistonaEditFieldValueChanged(app, event)
+            app.a = app.RadioPistonaEditField.Value;     
+        end
+
+        % Value changed function: DensidadRhoEditField
+        function DensidadRhoEditFieldValueChanged(app, event)
+            app.rho = app.DensidadRhoEditField.Value;
+        end
+
+        % Value changed function: velocidadsonidoCEditField
+        function velocidadsonidoCEditFieldValueChanged(app, event)
+            app.c = app.velocidadsonidoCEditField.Value;
+                    
+        end
+
+        % Value changed function: RadiodemedicionrEditField
+        function RadiodemedicionrEditFieldValueChanged(app, event)
+            app.r = app.RadiodemedicionrEditField.Value;
+            
+        end
+
+        % Button pushed function: GraficarButton
+        function GraficarButtonPushed(app, event)
+            app.w = 2*pi*app.f;
+            app.k = app.w / app.c;
+            app.r1 = linspace(0,app.r,1000);
+            % Calcular p3
+            app.p3 = 2 .* app.rho .* app.c .* app.U .* ( (app.k .* app.a.^2) ./ (4 .* app.r1) );
+    
+            % Calcular p1
+            app.p1 = 2 .* app.rho .* app.c .* app.U .* abs(sin(0.5 .* app.k .* app.r1 .* (1-sqrt(1+(app.a.^2./app.r1.^2)))));
+
+            % Graficar p3 (en rojo)
+            plot(app.UIAxes, app.r1, app.p3, 'r', 'LineWidth', 1.5,'LineStyle','--' );  % 'r' para rojo y mayor grosor de línea
+            hold(app.UIAxes, 'on');  % Mantener la gráfica para superponer p1
+
+            % Graficar p1 (en azul)
+            plot(app.UIAxes, app.r1, app.p1, 'b', 'LineWidth', 1.5);  % 'b' para azul y mayor grosor de línea
+
+            % Configurar títulos y etiquetas
+            title(app.UIAxes, 'Presión del pistón en función de la distancica');
+            xlabel(app.UIAxes, 'Distancia r [m]');
+            ylabel(app.UIAxes, 'Presión [Pa]');
+    
+            % Añadir leyenda para identificar las gráficas
+            legend(app.UIAxes, {'Aproximación de p', 'Presión', 'Fresnel', 'Fraunhofer'});
+
+            % Ajustar el límite del eje x
+            xlim(app.UIAxes, [0 app.r]);  % Límite del eje Y de 0 a 500
+
+            % Ajustar el límite del eje Y
+            app.max_p1 = max(app.p1);
+            ylim(app.UIAxes, [0 (app.max_p1+400)]);  % Límite del eje Y de 0 a maximo de p1
+
+            % Quitar hold después de graficar
+            hold(app.UIAxes, 'off'); 
+        end
+
+        % Button pushed function: RegindeFraunhoferButton
+        function RegindeFraunhoferButtonPushed(app, event)
+            % Calcular zd con la fórmula adjunta: zd = (k * a^2) / 2
+            app.zd = (app.k * app.a.^2) / 2;
+
+            % Graficar la línea vertical en zd
+            xline(app.UIAxes, app.zd, '--k', 'LineWidth', 2);  % Línea discontinua negra en zd
+            legend(app.UIAxes, {'Aproximación de p', 'Presión', 'Fraunhofer', 'Fresnel'});
+
+    
+            % Añadir texto o etiqueta indicando la posición de zd
+            text(app.UIAxes, app.zd, 250, ['z_d = ' num2str(app.zd)], 'HorizontalAlignment', 'left', 'Color', 'black');
+        end
+
+        % Button pushed function: RegindeFresnelButton
+        function RegindeFresnelButtonPushed(app, event)
+            % Calcular zf: zf = zd / pi
+            app.zf = (app.k * app.a.^2) / (2*pi);
+    
+            % Graficar la línea vertical en zf
+            xline(app.UIAxes, app.zf, '--y', 'LineWidth', 2, 'Color', 'magenta');  % Línea discontinua azul en zf
+            legend(app.UIAxes, {'Aproximación de p', 'Presión', 'Fraunhofer', 'Fresnel'});
+
+    
+            % Añadir texto o etiqueta indicando la posición de zf
+            text(app.UIAxes, app.zf, 250, ['z_f = ' num2str(app.zf)], 'HorizontalAlignment', 'left', 'Color', 'magenta');
+        end
+
+        % Button pushed function: PeaksButton
+        function PeaksButtonPushed(app, event)
+            app.lamda = app.c ./ app.f;
+            app.x = linspace(0, app.r, 1000);  % Definir los puntos donde evaluar p1
+            app.p1 = 2 .* app.rho .* app.c .* app.U .* abs(sin(0.5 .* app.k .* app.x .* (1 - sqrt(1 + (app.a.^2 ./ app.x.^2)))));
+
+            % Encontrar los máximos de la función p1
+            [maxVals, ~] = findpeaks(app.p1, app.x);
+    
+            % Encontrar los mínimos de la función p1
+            [app.minVals, ~] = findpeaks(-app.p1, app.x);  % Invertir p1 para encontrar los mínimos
+            app.minVals = -app.minVals;  % Volver a los valores originales de los mínimos
+
+            % Contar cuántos máximos y mínimos hay
+            app.num_maximos = length(maxVals);  % Número de máximos
+            app.num_minimos = length(app.minVals);  % Número de mínimos
+
+            % Sumar los máximos y mínimos
+            app.total_extremos = app.num_maximos + app.num_minimos;
+
+            % Mostrar la cantidad de máximos, mínimos y el total en la consola
+            fprintf('Número de máximos: %d\n', app.num_maximos);
+            fprintf('Número de mínimos: %d\n', app.num_minimos);
+            fprintf('Total de máximos y mínimos: %d\n', app.total_extremos);
+
+            % Crear una celda para almacenar los resultados
+            app.resultados = cell(app.total_extremos, 2);  % Crear celdas para 'r_n' y 'valor'
+
+    % Iterar sobre los valores de n, hasta el número total de extremos (máximos + mínimos)
+            for i = 1:app.total_extremos
+                app.n = i;  % Valor actual de n
+        
+                % Calcular r_n usando la fórmula
+                app.rn = (((app.a ./ app.lamda) .* (1 ./ app.n)) - ((app.n ./ 4) .* (app.lamda ./ app.a))) .* app.a;
+
+                % Almacenar el valor en la tabla
+                app.resultados{i, 1} = ['r' num2str(app.n)];  % Columna de nombres (r1, r2, etc.)
+                app.resultados{i, 2} = app.rn;  % Columna de valores de r_n
+            end
+
+            % Actualizar la tabla en la UI con los valores de picos
+            app.UITable.Data = app.resultados;  % Asignar los resultados a la tabla
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create UIFigure and hide until all components are created
+            app.UIFigure = uifigure('Visible', 'off');
+            app.UIFigure.Position = [100 100 856 715];
+            app.UIFigure.Name = 'MATLAB App';
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.UIFigure);
+            title(app.UIAxes, 'Gráfico del pistón circular plano')
+            xlabel(app.UIAxes, 'Radio (m)')
+            ylabel(app.UIAxes, 'Presion (pa)')
+            zlabel(app.UIAxes, 'Z')
+            app.UIAxes.FontWeight = 'bold';
+            app.UIAxes.XGrid = 'on';
+            app.UIAxes.YGrid = 'on';
+            app.UIAxes.YMinorGrid = 'on';
+            app.UIAxes.Position = [295 158 533 523];
+
+            % Create GraficarButton
+            app.GraficarButton = uibutton(app.UIFigure, 'push');
+            app.GraficarButton.ButtonPushedFcn = createCallbackFcn(app, @GraficarButtonPushed, true);
+            app.GraficarButton.BackgroundColor = [0 0 1];
+            app.GraficarButton.FontWeight = 'bold';
+            app.GraficarButton.FontColor = [1 1 1];
+            app.GraficarButton.Position = [528 116 100 23];
+            app.GraficarButton.Text = 'Graficar';
+
+            % Create RegindeFresnelButton
+            app.RegindeFresnelButton = uibutton(app.UIFigure, 'push');
+            app.RegindeFresnelButton.ButtonPushedFcn = createCallbackFcn(app, @RegindeFresnelButtonPushed, true);
+            app.RegindeFresnelButton.BackgroundColor = [0.949 0.6941 0.9294];
+            app.RegindeFresnelButton.Position = [522 30 113 23];
+            app.RegindeFresnelButton.Text = 'Región de Fresnel';
+
+            % Create RegindeFraunhoferButton
+            app.RegindeFraunhoferButton = uibutton(app.UIFigure, 'push');
+            app.RegindeFraunhoferButton.ButtonPushedFcn = createCallbackFcn(app, @RegindeFraunhoferButtonPushed, true);
+            app.RegindeFraunhoferButton.BackgroundColor = [0.949 0.5216 0.5216];
+            app.RegindeFraunhoferButton.Position = [512 61 132 23];
+            app.RegindeFraunhoferButton.Text = 'Región de Fraunhofer';
+
+            % Create UITable
+            app.UITable = uitable(app.UIFigure);
+            app.UITable.BackgroundColor = [0.9412 0.9412 0.9412];
+            app.UITable.ColumnName = {'r'; 'valor'};
+            app.UITable.RowName = {};
+            app.UITable.Position = [33 127 235 228];
+
+            % Create PeaksButton
+            app.PeaksButton = uibutton(app.UIFigure, 'push');
+            app.PeaksButton.ButtonPushedFcn = createCallbackFcn(app, @PeaksButtonPushed, true);
+            app.PeaksButton.FontWeight = 'bold';
+            app.PeaksButton.Position = [101 94 100 23];
+            app.PeaksButton.Text = 'Peaks';
+
+            % Create PresindelPistncircularPlanoLabel
+            app.PresindelPistncircularPlanoLabel = uilabel(app.UIFigure);
+            app.PresindelPistncircularPlanoLabel.BackgroundColor = [0.6588 0.7843 0.9686];
+            app.PresindelPistncircularPlanoLabel.HorizontalAlignment = 'center';
+            app.PresindelPistncircularPlanoLabel.FontSize = 14;
+            app.PresindelPistncircularPlanoLabel.FontWeight = 'bold';
+            app.PresindelPistncircularPlanoLabel.FontColor = [1 1 1];
+            app.PresindelPistncircularPlanoLabel.Position = [24 660 256 32];
+            app.PresindelPistncircularPlanoLabel.Text = 'Presión del Pistón circular Plano';
+
+            % Create ParmetrosPanel
+            app.ParmetrosPanel = uipanel(app.UIFigure);
+            app.ParmetrosPanel.Title = 'Parámetros';
+            app.ParmetrosPanel.Position = [33 398 236 244];
+
+            % Create FrecuenciafEditField
+            app.FrecuenciafEditField = uieditfield(app.ParmetrosPanel, 'numeric');
+            app.FrecuenciafEditField.ValueChangedFcn = createCallbackFcn(app, @FrecuenciafEditFieldValueChanged, true);
+            app.FrecuenciafEditField.FontSize = 10;
+            app.FrecuenciafEditField.Position = [141 178 69 22];
+
+            % Create Label
+            app.Label = uilabel(app.ParmetrosPanel);
+            app.Label.FontName = 'Arial';
+            app.Label.FontSize = 10;
+            app.Label.FontWeight = 'bold';
+            app.Label.Position = [68 178 68 22];
+            app.Label.Text = 'Frecuencia (f)';
+
+            % Create VelocidadvolumetricaUEditFieldLabel
+            app.VelocidadvolumetricaUEditFieldLabel = uilabel(app.ParmetrosPanel);
+            app.VelocidadvolumetricaUEditFieldLabel.WordWrap = 'on';
+            app.VelocidadvolumetricaUEditFieldLabel.FontName = 'Arial';
+            app.VelocidadvolumetricaUEditFieldLabel.FontSize = 10;
+            app.VelocidadvolumetricaUEditFieldLabel.FontWeight = 'bold';
+            app.VelocidadvolumetricaUEditFieldLabel.Position = [6 143 130 25];
+            app.VelocidadvolumetricaUEditFieldLabel.Text = 'Velocidad volumetrica (U)';
+
+            % Create VelocidadvolumetricaUEditField
+            app.VelocidadvolumetricaUEditField = uieditfield(app.ParmetrosPanel, 'numeric');
+            app.VelocidadvolumetricaUEditField.ValueChangedFcn = createCallbackFcn(app, @VelocidadvolumetricaUEditFieldValueChanged, true);
+            app.VelocidadvolumetricaUEditField.FontSize = 10;
+            app.VelocidadvolumetricaUEditField.Position = [141 146 69 22];
+
+            % Create RadioPistonaEditFieldLabel
+            app.RadioPistonaEditFieldLabel = uilabel(app.ParmetrosPanel);
+            app.RadioPistonaEditFieldLabel.HorizontalAlignment = 'center';
+            app.RadioPistonaEditFieldLabel.WordWrap = 'on';
+            app.RadioPistonaEditFieldLabel.FontName = 'Arial';
+            app.RadioPistonaEditFieldLabel.FontSize = 10;
+            app.RadioPistonaEditFieldLabel.FontWeight = 'bold';
+            app.RadioPistonaEditFieldLabel.Position = [43 114 102 22];
+            app.RadioPistonaEditFieldLabel.Text = 'Radio Piston (a)';
+
+            % Create RadioPistonaEditField
+            app.RadioPistonaEditField = uieditfield(app.ParmetrosPanel, 'numeric');
+            app.RadioPistonaEditField.ValueChangedFcn = createCallbackFcn(app, @RadioPistonaEditFieldValueChanged, true);
+            app.RadioPistonaEditField.FontSize = 10;
+            app.RadioPistonaEditField.Position = [141 114 69 22];
+
+            % Create DensidadRhoEditFieldLabel
+            app.DensidadRhoEditFieldLabel = uilabel(app.ParmetrosPanel);
+            app.DensidadRhoEditFieldLabel.HorizontalAlignment = 'center';
+            app.DensidadRhoEditFieldLabel.WordWrap = 'on';
+            app.DensidadRhoEditFieldLabel.FontName = 'Arial';
+            app.DensidadRhoEditFieldLabel.FontSize = 10;
+            app.DensidadRhoEditFieldLabel.FontWeight = 'bold';
+            app.DensidadRhoEditFieldLabel.Position = [43 83 102 22];
+            app.DensidadRhoEditFieldLabel.Text = 'Densidad (Rho)';
+
+            % Create DensidadRhoEditField
+            app.DensidadRhoEditField = uieditfield(app.ParmetrosPanel, 'numeric');
+            app.DensidadRhoEditField.ValueChangedFcn = createCallbackFcn(app, @DensidadRhoEditFieldValueChanged, true);
+            app.DensidadRhoEditField.FontSize = 10;
+            app.DensidadRhoEditField.Position = [141 83 69 22];
+
+            % Create velocidadsonidoCEditFieldLabel
+            app.velocidadsonidoCEditFieldLabel = uilabel(app.ParmetrosPanel);
+            app.velocidadsonidoCEditFieldLabel.HorizontalAlignment = 'center';
+            app.velocidadsonidoCEditFieldLabel.WordWrap = 'on';
+            app.velocidadsonidoCEditFieldLabel.FontName = 'Arial';
+            app.velocidadsonidoCEditFieldLabel.FontSize = 10;
+            app.velocidadsonidoCEditFieldLabel.FontWeight = 'bold';
+            app.velocidadsonidoCEditFieldLabel.Position = [34 48 102 22];
+            app.velocidadsonidoCEditFieldLabel.Text = 'velocidad sonido (C)';
+
+            % Create velocidadsonidoCEditField
+            app.velocidadsonidoCEditField = uieditfield(app.ParmetrosPanel, 'numeric');
+            app.velocidadsonidoCEditField.ValueChangedFcn = createCallbackFcn(app, @velocidadsonidoCEditFieldValueChanged, true);
+            app.velocidadsonidoCEditField.FontSize = 10;
+            app.velocidadsonidoCEditField.Position = [141 48 69 22];
+
+            % Create RadiodemedicionrEditFieldLabel
+            app.RadiodemedicionrEditFieldLabel = uilabel(app.ParmetrosPanel);
+            app.RadiodemedicionrEditFieldLabel.WordWrap = 'on';
+            app.RadiodemedicionrEditFieldLabel.FontName = 'Arial';
+            app.RadiodemedicionrEditFieldLabel.FontSize = 10;
+            app.RadiodemedicionrEditFieldLabel.FontWeight = 'bold';
+            app.RadiodemedicionrEditFieldLabel.Position = [33 13 103 25];
+            app.RadiodemedicionrEditFieldLabel.Text = 'Radio de medicion (r)';
+
+            % Create RadiodemedicionrEditField
+            app.RadiodemedicionrEditField = uieditfield(app.ParmetrosPanel, 'numeric');
+            app.RadiodemedicionrEditField.ValueChangedFcn = createCallbackFcn(app, @RadiodemedicionrEditFieldValueChanged, true);
+            app.RadiodemedicionrEditField.FontSize = 10;
+            app.RadiodemedicionrEditField.Position = [141 14 69 22];
+
+            % Show the figure after all components are created
+            app.UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = PISTON_SONORIZACION_exported
+
+            % Create UIFigure and components
+            createComponents(app)
+
+            % Register the app with App Designer
+            registerApp(app, app.UIFigure)
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.UIFigure)
+        end
+    end
+end
